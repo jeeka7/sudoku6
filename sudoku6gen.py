@@ -135,7 +135,8 @@ def get_page_setup_html():
             }
 
             const gridStyles = `
-                body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+                body { font-family: Arial, sans-serif; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+                h1 { margin-bottom: 20px; }
                 .sudoku-container {
                     display: grid;
                     grid-template-columns: repeat(6, 60px);
@@ -159,6 +160,7 @@ def get_page_setup_html():
 
             const printWindow = window.open('', '_blank');
             printWindow.document.write('<html><head><title>' + title + '</title><style>' + gridStyles + '</style></head><body>');
+            printWindow.document.write('<h1>' + title + '</h1>');
             printWindow.document.write(gridElement.innerHTML);
             printWindow.document.write('</body></html>');
             printWindow.document.close();
@@ -168,20 +170,6 @@ def get_page_setup_html():
                 printWindow.close();
             }, 250);
         }
-
-        window.addEventListener('load', function() {
-            const observer = new MutationObserver(function(mutations) {
-                const puzzleBtn = document.getElementById('print-puzzle-btn');
-                if (puzzleBtn && !puzzleBtn.onclick) {
-                    puzzleBtn.onclick = function() { printElement('puzzle-grid', 'Sudoku Puzzle'); };
-                }
-                const solutionBtn = document.getElementById('print-solution-btn');
-                if (solutionBtn && !solutionBtn.onclick) {
-                    solutionBtn.onclick = function() { printElement('solution-grid', 'Sudoku Solution'); };
-                }
-            });
-            observer.observe(document.body, { childList: true, subtree: true });
-        });
     </script>
     """
 
@@ -227,7 +215,7 @@ with col1:
     st.header("Puzzle")
     if 'puzzle' in st.session_state:
         st.markdown(get_grid_html(st.session_state.puzzle, "puzzle-grid"), unsafe_allow_html=True)
-        st.markdown('<button id="print-puzzle-btn" class="print-button">🖨️ Print Puzzle</button>', unsafe_allow_html=True)
+        st.markdown('<button onclick="printElement(\'puzzle-grid\', \'Sudoku Puzzle\')" class="print-button">🖨️ Print Puzzle</button>', unsafe_allow_html=True)
     else:
         st.info("Click 'Generate New Puzzle' in the sidebar to start.")
 
@@ -239,5 +227,5 @@ with col2:
         
         if st.session_state.get('show_solution', False):
             st.markdown(get_grid_html(st.session_state.solution, "solution-grid"), unsafe_allow_html=True)
-            st.markdown('<button id="print-solution-btn" class="print-button">🖨️ Print Solution</button>', unsafe_allow_html=True)
+            st.markdown('<button onclick="printElement(\'solution-grid\', \'Sudoku Solution\')" class="print-button">🖨️ Print Solution</button>', unsafe_allow_html=True)
 
