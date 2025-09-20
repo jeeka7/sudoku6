@@ -128,30 +128,49 @@ def get_page_setup_html():
         
         /* Print-Specific Styles */
         @media print {
-            body * { visibility: hidden; }
-            .print-target, .print-target * { visibility: visible; }
+            body * { visibility: hidden !important; }
+            .print-target, .print-target * { visibility: visible !important; }
             .print-target {
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
-                height: 100%;
-                transform: scale(1.2); /* Make it slightly larger on paper */
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                height: 100% !important;
             }
         }
     </style>
     <script>
         function printElement(elementId) {
-            const currentlyPrinted = document.querySelector('.print-target');
-            if (currentlyPrinted) {
-                currentlyPrinted.classList.remove('print-target');
-            }
+            const PRINT_TARGET_CLASS = 'print-target';
             const elementToPrint = document.getElementById(elementId);
-            if (elementToPrint) {
-                elementToPrint.classList.add('print-target');
-                window.print();
+            if (!elementToPrint) {
+                console.error('Element not found for printing:', elementId);
+                return;
             }
+            // Clean up previous targets
+            document.querySelectorAll('.' + PRINT_TARGET_CLASS).forEach(
+                target => target.classList.remove(PRINT_TARGET_CLASS)
+            );
+            // Mark our element for printing
+            elementToPrint.classList.add(PRINT_TARGET_CLASS);
+            window.print();
         }
+
+        // Use a more reliable way to attach event listeners
+        window.addEventListener('load', function() {
+            // Use a mutation observer to handle Streamlit's dynamic DOM changes
+            const observer = new MutationObserver(function(mutations) {
+                const puzzleBtn = document.getElementById('print-puzzle-btn');
+                if (puzzleBtn && !puzzleBtn.onclick) {
+                    puzzleBtn.onclick = function() { printElement('puzzle-grid'); };
+                }
+                const solutionBtn = document.getElementById('print-solution-btn');
+                if (solutionBtn && !solutionBtn.onclick) {
+                    solutionBtn.onclick = function() { printElement('solution-grid'); };
+                }
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
+        });
     </script>
     """
 
@@ -197,7 +216,7 @@ with col1:
     st.header("Puzzle")
     if 'puzzle' in st.session_state:
         st.markdown(get_grid_html(st.session_state.puzzle, "puzzle-grid"), unsafe_allow_html=True)
-        st.markdown('<button onclick="printElement(\'puzzle-grid\')" class="print-button">🖨️ Print Puzzle</button>', unsafe_allow_html=True)
+        st.markdown('<button id="print-puzzle-btn" class="print-button">🖨️ Print Puzzle</button>', unsafe_allow_html=True)
     else:
         st.info("Click 'Generate New Puzzle' in the sidebar to start.")
 
@@ -209,5 +228,5 @@ with col2:
         
         if st.session_state.get('show_solution', False):
             st.markdown(get_grid_html(st.session_state.solution, "solution-grid"), unsafe_allow_html=True)
-            st.markdown('<button onclick="printElement(\'solution-grid\')" class="print-button">🖨️ Print Solution</button>', unsafe_allow_html=True)
+            st.markdown('<button id="print-solution-btn" class="print-button">🖨️ Print Solution</button>', unsafe_allow_html=True)
 
