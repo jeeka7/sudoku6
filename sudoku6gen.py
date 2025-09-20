@@ -125,6 +125,24 @@ def get_page_setup_html():
             border-color: #FF4B4B;
             background-color: #FF4B4B;
         }
+
+        /* New Print Styles - Hides everything except the target element */
+        @media print {
+            /* Add a class to the body when printing is active */
+            body.sudoku-printing-mode > * {
+                visibility: hidden !important;
+            }
+            body.sudoku-printing-mode .sudoku-print-target,
+            body.sudoku-printing-mode .sudoku-print-target * {
+                visibility: visible !important;
+            }
+            body.sudoku-printing-mode .sudoku-print-target {
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+            }
+        }
     </style>
     <script>
         function printElement(elementId, title) {
@@ -134,41 +152,22 @@ def get_page_setup_html():
                 return;
             }
 
-            const gridStyles = `
-                body { font-family: Arial, sans-serif; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-                h1 { margin-bottom: 20px; }
-                .sudoku-container {
-                    display: grid;
-                    grid-template-columns: repeat(6, 60px);
-                    grid-template-rows: repeat(6, 60px);
-                    border: 3px solid #000;
-                }
-                .sudoku-cell {
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    font-size: 2rem;
-                    font-weight: bold;
-                    color: #000;
-                    border: 1px solid #ccc;
-                }
-                .sudoku-cell:nth-child(3n) { border-right: 2px solid #333; }
-                .sudoku-cell:nth-child(6n) { border-right: 1px solid #ccc; }
-                .sudoku-container > div:nth-child(2n) .sudoku-cell { border-bottom: 2px solid #333; }
-                .sudoku-container > div:nth-child(6n) .sudoku-cell { border-bottom: 1px solid #ccc; }
-            `;
+            // Add classes to activate the print-specific CSS
+            document.body.classList.add('sudoku-printing-mode');
+            gridElement.classList.add('sudoku-print-target');
 
-            const printWindow = window.open('', '_blank');
-            printWindow.document.write('<html><head><title>' + title + '</title><style>' + gridStyles + '</style></head><body>');
-            printWindow.document.write('<h1>' + title + '</h1>');
-            printWindow.document.write(gridElement.innerHTML);
-            printWindow.document.write('</body></html>');
-            printWindow.document.close();
-            printWindow.focus();
-            setTimeout(function() { // Timeout helps ensure content is rendered before printing
-                printWindow.print();
-                printWindow.close();
-            }, 250);
+            // Define a function to clean up classes after printing
+            const cleanupAfterPrint = () => {
+                document.body.classList.remove('sudoku-printing-mode');
+                gridElement.classList.remove('sudoku-print-target');
+                window.removeEventListener('afterprint', cleanupAfterPrint);
+            };
+
+            // Listen for the 'afterprint' event to run cleanup
+            window.addEventListener('afterprint', cleanupAfterPrint);
+
+            // Trigger the browser's print dialog
+            window.print();
         }
     </script>
     """
