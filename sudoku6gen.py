@@ -16,13 +16,8 @@ DIFFICULTY_LEVELS = {
 
 def is_safe(grid, row, col, num):
     """Checks if it's safe to place a number in a given cell."""
-    # Check row
-    if num in grid[row, :]:
+    if num in grid[row, :] or num in grid[:, col]:
         return False
-    # Check column
-    if num in grid[:, col]:
-        return False
-    # Check 2x3 box
     start_row, start_col = BOX_ROWS * (row // BOX_ROWS), BOX_COLS * (col // BOX_COLS)
     if num in grid[start_row:start_row + BOX_ROWS, start_col:start_col + BOX_COLS]:
         return False
@@ -40,47 +35,48 @@ def solve_grid(grid):
     """Solves the Sudoku grid using backtracking."""
     find = find_empty(grid)
     if not find:
-        return True  # Puzzle is solved
+        return True
     else:
         row, col = find
 
     nums = list(range(1, GRID_SIZE + 1))
-    random.shuffle(nums) # Ensures different solutions each time
+    random.shuffle(nums)
 
     for num in nums:
         if is_safe(grid, row, col, num):
             grid[row, col] = num
             if solve_grid(grid):
                 return True
-            grid[row, col] = 0  # Backtrack
+            grid[row, col] = 0
     return False
 
 def generate_puzzle(difficulty):
     """Generates a new puzzle with a unique solution."""
-    # 1. Create a full, solved grid
     grid = np.zeros((GRID_SIZE, GRID_SIZE), dtype=int)
     solve_grid(grid)
     solution = grid.copy()
 
-    # 2. Poke holes in the grid
     puzzle = grid.copy()
     num_to_remove = DIFFICULTY_LEVELS.get(difficulty, 18)
     
+    cells_removed = 0
     attempts = 0
-    while np.count_nonzero(puzzle) > (GRID_SIZE * GRID_SIZE) - num_to_remove and attempts < 100:
+    while cells_removed < num_to_remove and attempts < 1000:
         row, col = random.randint(0, GRID_SIZE - 1), random.randint(0, GRID_SIZE - 1)
         if puzzle[row, col] != 0:
             puzzle[row, col] = 0
+            cells_removed += 1
         attempts += 1
         
     return puzzle, solution
 
 # --- Streamlit UI Components ---
 
-def get_sudoku_styles():
-    """Returns the CSS styles for the Sudoku grids."""
+def get_page_setup_html():
+    """Returns a single HTML block with all necessary CSS and JavaScript for the page."""
     return """
     <style>
+        /* Sudoku Grid Styles */
         .sudoku-container {
             display: grid;
             grid-template-columns: repeat(6, 1fr);
@@ -92,64 +88,64 @@ def get_sudoku_styles():
             max-height: 300px;
             margin: 20px auto;
             font-family: 'Arial', sans-serif;
+            background-color: #fff;
         }
         .sudoku-cell {
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 1.5em;
+            font-size: clamp(1rem, 4vmin, 1.8rem);
+            font-weight: bold;
+            color: #333;
             border: 1px solid #ccc;
         }
-        /* Thick borders for the 2x3 boxes */
         .sudoku-cell:nth-child(3n) { border-right: 2px solid #555; }
         .sudoku-cell:nth-child(6n) { border-right: 1px solid #ccc; }
         .sudoku-container > div:nth-child(2n) .sudoku-cell { border-bottom: 2px solid #555; }
         .sudoku-container > div:nth-child(6n) .sudoku-cell { border-bottom: 1px solid #ccc; }
-    </style>
-    """
 
-def get_grid_html(grid, container_id):
-    """Generates the HTML for a single Sudoku grid."""
-    html = f'<div id="{container_id}"><div class="sudoku-container">'
-    for r in range(GRID_SIZE):
-        html += '<div class="sudoku-row" style="display: contents;">'
-        for c in range(GRID_SIZE):
-            num = grid[r, c]
-            display_num = num if num != 0 else ""
-            html += f'<div class="sudoku-cell">{display_num}</div>'
-        html += '</div>'
-    html += "</div></div>"
-    return html
-
-def get_unified_print_script():
-    """Generates a single block of JavaScript and CSS to handle printing for multiple elements."""
-    return """
-    <style>
+        /* Custom Print Button Styles */
+        .print-button {
+            display: inline-block;
+            padding: 0.5em 1em;
+            font-size: 16px;
+            font-weight: 500;
+            color: #0F1116;
+            background-color: #FFFFFF;
+            border: 1px solid rgba(49, 51, 63, 0.2);
+            border-radius: 0.5rem;
+            cursor: pointer;
+            margin-top: 10px;
+            text-align: center;
+            text-decoration: none;
+            transition: all 0.2s ease-in-out;
+        }
+        .print-button:hover {
+            color: #FFFFFF;
+            border-color: #FF4B4B;
+            background-color: #FF4B4B;
+        }
+        
+        /* Print-Specific Styles */
         @media print {
-            body * {
-                visibility: hidden;
-            }
-            .print-target, .print-target * {
-                visibility: visible;
-            }
+            body * { visibility: hidden; }
+            .print-target, .print-target * { visibility: visible; }
             .print-target {
                 position: absolute;
-                left: 50%;
-                top: 50%;
-                transform: translate(-50%, -50%);
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: 100%;
+                transform: scale(1.2); /* Make it slightly larger on paper */
             }
-            .stButton { display: none; }
         }
     </style>
     <script>
         function printElement(elementId) {
-            // Remove the class from any other element that might have it
             const currentlyPrinted = document.querySelector('.print-target');
             if (currentlyPrinted) {
                 currentlyPrinted.classList.remove('print-target');
             }
-
-            // Add the class to the element we want to print
             const elementToPrint = document.getElementById(elementId);
             if (elementToPrint) {
                 elementToPrint.classList.add('print-target');
@@ -159,16 +155,28 @@ def get_unified_print_script():
     </script>
     """
 
+def get_grid_html(grid, container_id):
+    """Generates the HTML for a single Sudoku grid."""
+    html = f'<div id="{container_id}"><div class="sudoku-container">'
+    for r in range(GRID_SIZE):
+        html += '<div style="display: contents;">'
+        for c in range(GRID_SIZE):
+            num = grid[r, c]
+            display_num = str(num) if num != 0 else ""
+            html += f'<div class="sudoku-cell">{display_num}</div>'
+        html += '</div>'
+    html += "</div></div>"
+    return html
+
 # --- Main Application ---
 
 st.set_page_config(page_title="6x6 Sudoku Generator", layout="wide")
 
-# Add the CSS and JS to the page once.
-st.markdown(get_sudoku_styles(), unsafe_allow_html=True)
-st.markdown(get_unified_print_script(), unsafe_allow_html=True)
+# Inject all CSS and JavaScript at once.
+st.markdown(get_page_setup_html(), unsafe_allow_html=True)
 
 st.title("🔢 6x6 Sudoku Puzzle Generator")
-st.write("Create a new 6x6 Sudoku puzzle. Choose your difficulty and click 'Generate'.")
+st.write("Create a new puzzle to solve on screen or print out.")
 
 # Sidebar for controls
 with st.sidebar:
@@ -183,27 +191,23 @@ with st.sidebar:
             st.session_state.show_solution = False
 
 # Main content area
-col1, col2 = st.columns([0.7, 0.3])
+col1, col2 = st.columns([0.65, 0.35])
 
 with col1:
+    st.header("Puzzle")
     if 'puzzle' in st.session_state:
-        # Generate the HTML for the puzzle grid
         st.markdown(get_grid_html(st.session_state.puzzle, "puzzle-grid"), unsafe_allow_html=True)
-        # Button to print the puzzle
-        st.button("🖨️ Print Puzzle", on_click=st.components.v1.html, args=('<script>parent.printElement("puzzle-grid")</script>', 50, 50))
+        st.markdown('<button onclick="printElement(\'puzzle-grid\')" class="print-button">🖨️ Print Puzzle</button>', unsafe_allow_html=True)
     else:
         st.info("Click 'Generate New Puzzle' in the sidebar to start.")
 
 with col2:
     if 'puzzle' in st.session_state:
-        st.subheader("Solution")
-        # Use a button to toggle solution visibility to prevent spoilers
+        st.header("Solution")
         if st.button("Toggle Solution"):
             st.session_state.show_solution = not st.session_state.get('show_solution', False)
         
         if st.session_state.get('show_solution', False):
-            # Display solution using the same HTML grid component
             st.markdown(get_grid_html(st.session_state.solution, "solution-grid"), unsafe_allow_html=True)
-            # Add button to print the solution
-            st.button("🖨️ Print Solution", on_click=st.components.v1.html, args=('<script>parent.printElement("solution-grid")</script>', 50, 50))
+            st.markdown('<button onclick="printElement(\'solution-grid\')" class="print-button">🖨️ Print Solution</button>', unsafe_allow_html=True)
 
