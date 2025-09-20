@@ -76,7 +76,7 @@ def get_page_setup_html():
     """Returns a single HTML block with all necessary CSS and JavaScript for the page."""
     return """
     <style>
-        /* Sudoku Grid Styles */
+        /* Styles for the grid displayed on the page */
         .sudoku-container {
             display: grid;
             grid-template-columns: repeat(6, 1fr);
@@ -125,48 +125,59 @@ def get_page_setup_html():
             border-color: #FF4B4B;
             background-color: #FF4B4B;
         }
-        
-        /* Print-Specific Styles */
-        @media print {
-            body * { visibility: hidden !important; }
-            .print-target, .print-target * { visibility: visible !important; }
-            .print-target {
-                position: absolute !important;
-                left: 0 !important;
-                top: 0 !important;
-                width: 100% !important;
-                height: 100% !important;
-            }
-        }
     </style>
     <script>
-        function printElement(elementId) {
-            const PRINT_TARGET_CLASS = 'print-target';
-            const elementToPrint = document.getElementById(elementId);
-            if (!elementToPrint) {
-                console.error('Element not found for printing:', elementId);
+        function printElement(elementId, title) {
+            const gridElement = document.getElementById(elementId);
+            if (!gridElement) {
+                console.error('Element to print not found:', elementId);
                 return;
             }
-            // Clean up previous targets
-            document.querySelectorAll('.' + PRINT_TARGET_CLASS).forEach(
-                target => target.classList.remove(PRINT_TARGET_CLASS)
-            );
-            // Mark our element for printing
-            elementToPrint.classList.add(PRINT_TARGET_CLASS);
-            window.print();
+
+            const gridStyles = `
+                body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+                .sudoku-container {
+                    display: grid;
+                    grid-template-columns: repeat(6, 60px);
+                    grid-template-rows: repeat(6, 60px);
+                    border: 3px solid #000;
+                }
+                .sudoku-cell {
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    font-size: 2rem;
+                    font-weight: bold;
+                    color: #000;
+                    border: 1px solid #ccc;
+                }
+                .sudoku-cell:nth-child(3n) { border-right: 2px solid #333; }
+                .sudoku-cell:nth-child(6n) { border-right: 1px solid #ccc; }
+                .sudoku-container > div:nth-child(2n) .sudoku-cell { border-bottom: 2px solid #333; }
+                .sudoku-container > div:nth-child(6n) .sudoku-cell { border-bottom: 1px solid #ccc; }
+            `;
+
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write('<html><head><title>' + title + '</title><style>' + gridStyles + '</style></head><body>');
+            printWindow.document.write(gridElement.innerHTML);
+            printWindow.document.write('</body></html>');
+            printWindow.document.close();
+            printWindow.focus();
+            setTimeout(function() { // Timeout helps ensure content is rendered before printing
+                printWindow.print();
+                printWindow.close();
+            }, 250);
         }
 
-        // Use a more reliable way to attach event listeners
         window.addEventListener('load', function() {
-            // Use a mutation observer to handle Streamlit's dynamic DOM changes
             const observer = new MutationObserver(function(mutations) {
                 const puzzleBtn = document.getElementById('print-puzzle-btn');
                 if (puzzleBtn && !puzzleBtn.onclick) {
-                    puzzleBtn.onclick = function() { printElement('puzzle-grid'); };
+                    puzzleBtn.onclick = function() { printElement('puzzle-grid', 'Sudoku Puzzle'); };
                 }
                 const solutionBtn = document.getElementById('print-solution-btn');
                 if (solutionBtn && !solutionBtn.onclick) {
-                    solutionBtn.onclick = function() { printElement('solution-grid'); };
+                    solutionBtn.onclick = function() { printElement('solution-grid', 'Sudoku Solution'); };
                 }
             });
             observer.observe(document.body, { childList: true, subtree: true });
