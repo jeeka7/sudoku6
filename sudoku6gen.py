@@ -77,9 +77,9 @@ def generate_puzzle(difficulty):
 
 # --- Streamlit UI Components ---
 
-def get_grid_html(grid):
-    """Generates the HTML and CSS for displaying the Sudoku grid."""
-    html = """
+def get_sudoku_styles():
+    """Returns the CSS styles for the Sudoku grids."""
+    return """
     <style>
         .sudoku-container {
             display: grid;
@@ -103,37 +103,36 @@ def get_grid_html(grid):
         /* Thick borders for the 2x3 boxes */
         .sudoku-cell:nth-child(3n) { border-right: 2px solid #555; }
         .sudoku-cell:nth-child(6n) { border-right: 1px solid #ccc; }
-        .sudoku-row:nth-child(2n) .sudoku-cell { border-bottom: 2px solid #555; }
-        .sudoku-row:nth-child(6n) .sudoku-cell { border-bottom: 1px solid #ccc; }
+        .sudoku-container > div:nth-child(2n) .sudoku-cell { border-bottom: 2px solid #555; }
+        .sudoku-container > div:nth-child(6n) .sudoku-cell { border-bottom: 1px solid #ccc; }
     </style>
-    <div id="printable-sudoku">
-        <div class="sudoku-container">
     """
+
+def get_grid_html(grid, container_id):
+    """Generates the HTML for a single Sudoku grid."""
+    html = f'<div id="{container_id}"><div class="sudoku-container">'
     for r in range(GRID_SIZE):
-        html += f'<div class="sudoku-row" style="display: contents;">'
+        html += '<div class="sudoku-row" style="display: contents;">'
         for c in range(GRID_SIZE):
             num = grid[r, c]
             display_num = num if num != 0 else ""
             html += f'<div class="sudoku-cell">{display_num}</div>'
-        html += f'</div>'
+        html += '</div>'
     html += "</div></div>"
     return html
 
-def get_print_script():
-    """Generates the JavaScript and CSS for the print functionality."""
-    print_script = """
+def get_unified_print_script():
+    """Generates a single block of JavaScript and CSS to handle printing for multiple elements."""
+    return """
     <style>
         @media print {
-            /* Hide everything on the page */
             body * {
                 visibility: hidden;
             }
-            /* Make the printable area and its children visible */
-            #printable-sudoku, #printable-sudoku * {
+            .print-target, .print-target * {
                 visibility: visible;
             }
-            /* Position the printable area on the page */
-            #printable-sudoku {
+            .print-target {
                 position: absolute;
                 left: 50%;
                 top: 50%;
@@ -143,16 +142,30 @@ def get_print_script():
         }
     </style>
     <script>
-        function printSudoku() {
-            window.print();
+        function printElement(elementId) {
+            // Remove the class from any other element that might have it
+            const currentlyPrinted = document.querySelector('.print-target');
+            if (currentlyPrinted) {
+                currentlyPrinted.classList.remove('print-target');
+            }
+
+            // Add the class to the element we want to print
+            const elementToPrint = document.getElementById(elementId);
+            if (elementToPrint) {
+                elementToPrint.classList.add('print-target');
+                window.print();
+            }
         }
     </script>
     """
-    return print_script
 
 # --- Main Application ---
 
 st.set_page_config(page_title="6x6 Sudoku Generator", layout="wide")
+
+# Add the CSS and JS to the page once.
+st.markdown(get_sudoku_styles(), unsafe_allow_html=True)
+st.markdown(get_unified_print_script(), unsafe_allow_html=True)
 
 st.title("🔢 6x6 Sudoku Puzzle Generator")
 st.write("Create a new 6x6 Sudoku puzzle. Choose your difficulty and click 'Generate'.")
@@ -174,20 +187,23 @@ col1, col2 = st.columns([0.7, 0.3])
 
 with col1:
     if 'puzzle' in st.session_state:
-        st.markdown(get_grid_html(st.session_state.puzzle), unsafe_allow_html=True)
-        st.markdown(get_print_script(), unsafe_allow_html=True)
-        st.button("🖨️ Print Puzzle", on_click=st.components.v1.html, args=('<script>parent.printSudoku()</script>', 50, 50))
-
+        # Generate the HTML for the puzzle grid
+        st.markdown(get_grid_html(st.session_state.puzzle, "puzzle-grid"), unsafe_allow_html=True)
+        # Button to print the puzzle
+        st.button("🖨️ Print Puzzle", on_click=st.components.v1.html, args=('<script>parent.printElement("puzzle-grid")</script>', 50, 50))
     else:
         st.info("Click 'Generate New Puzzle' in the sidebar to start.")
 
 with col2:
     if 'puzzle' in st.session_state:
         st.subheader("Solution")
-        if st.checkbox("Show Solution"):
-             st.session_state.show_solution = True
+        # Use a button to toggle solution visibility to prevent spoilers
+        if st.button("Toggle Solution"):
+            st.session_state.show_solution = not st.session_state.get('show_solution', False)
         
         if st.session_state.get('show_solution', False):
-            # Display solution as a simple table for clarity
-            solution_grid = st.session_state.solution
-            st.table(solution_grid.astype(str).replace('0', ''))
+            # Display solution using the same HTML grid component
+            st.markdown(get_grid_html(st.session_state.solution, "solution-grid"), unsafe_allow_html=True)
+            # Add button to print the solution
+            st.button("🖨️ Print Solution", on_click=st.components.v1.html, args=('<script>parent.printElement("solution-grid")</script>', 50, 50))
+
