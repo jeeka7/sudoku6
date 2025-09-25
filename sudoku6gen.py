@@ -201,6 +201,12 @@ with col1:
     if 'puzzle' in st.session_state:
         st.markdown(get_grid_html(st.session_state.puzzle, "puzzle-grid"), unsafe_allow_html=True)
         st.pdf(st.session_state.puzzle_pdf, height=500)
+        st.download_button(
+            label="Download Puzzle PDF",
+            data=st.session_state.puzzle_pdf,
+            file_name="sudoku_puzzle.pdf",
+            mime="application/pdf"
+        )
     else:
         st.info("Click 'Generate New Puzzle' in the sidebar to start.")
 
@@ -213,4 +219,10 @@ with col2:
         if st.session_state.get('show_solution', False):
             st.markdown(get_grid_html(st.session_state.solution, "solution-grid"), unsafe_allow_html=True)
             st.pdf(st.session_state.solution_pdf, height=500)
+            st.download_button(
+                label="Download Solution PDF",
+                data=st.session_state.solution_pdf,
+                file_name="sudoku_solution.pdf",
+                mime="application/pdf"
+            )
 
