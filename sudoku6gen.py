@@ -1,6 +1,10 @@
 import streamlit as st
 import numpy as np
 import random
+from io import BytesIO
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.units import inch
 
 # --- Constants ---
 GRID_SIZE = 6
@@ -70,110 +74,59 @@ def generate_puzzle(difficulty):
         
     return puzzle, solution
 
+# --- PDF Generation using reportlab ---
+def create_sudoku_pdf_bytes(grid_data, title):
+    """Generates a PDF for the Sudoku grid and returns it as bytes."""
+    buffer = BytesIO()
+    p = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
+
+    # Title
+    p.setFont("Helvetica-Bold", 24)
+    p.drawCentredString(width / 2, height - inch, title)
+
+    # Grid Drawing
+    cell_size = 0.75 * inch
+    grid_width = GRID_SIZE * cell_size
+    grid_height = GRID_SIZE * cell_size
+    x_start = (width - grid_width) / 2
+    y_start = height - 2 * inch - grid_height
+    
+    p.setFont("Helvetica", 24)
+    
+    # Draw numbers
+    for r in range(GRID_SIZE):
+        for c in range(GRID_SIZE):
+            num = grid_data[r, c]
+            x = x_start + c * cell_size
+            y = y_start + (GRID_SIZE - 1 - r) * cell_size 
+
+            if num != 0:
+                p.drawCentredString(x + cell_size / 2, y + cell_size / 2 - 10, str(num))
+    
+    # Draw grid lines
+    p.setLineWidth(1)
+    for i in range(GRID_SIZE + 1):
+        p.line(x_start + i * cell_size, y_start, x_start + i * cell_size, y_start + grid_height)
+        p.line(x_start, y_start + i * cell_size, x_start + grid_width, y_start + i * cell_size)
+
+    # Draw thicker box lines
+    p.setLineWidth(2.5)
+    for i in range(0, GRID_SIZE + 1, BOX_COLS):
+        p.line(x_start + i * cell_size, y_start, x_start + i * cell_size, y_start + grid_height)
+    for i in range(0, GRID_SIZE + 1, BOX_ROWS):
+        p.line(x_start, y_start + i * cell_size, x_start + grid_width, y_start + i * cell_size)
+
+    p.showPage()
+    p.save()
+    
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
 # --- Streamlit UI Components ---
-
-def get_page_setup_html():
-    """Returns a single HTML block with all necessary CSS and JavaScript for the page."""
-    return """
-    <style>
-        /* Styles for the grid displayed on the page */
-        .sudoku-container {
-            display: grid;
-            grid-template-columns: repeat(6, 1fr);
-            grid-template-rows: repeat(6, 1fr);
-            border: 3px solid #333;
-            width: 90vmin;
-            height: 60vmin;
-            max-width: 450px;
-            max-height: 300px;
-            margin: 20px auto;
-            font-family: 'Arial', sans-serif;
-            background-color: #fff;
-        }
-        .sudoku-cell {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: clamp(1rem, 4vmin, 1.8rem);
-            font-weight: bold;
-            color: #333;
-            border: 1px solid #ccc;
-        }
-        .sudoku-cell:nth-child(3n) { border-right: 2px solid #555; }
-        .sudoku-cell:nth-child(6n) { border-right: 1px solid #ccc; }
-        .sudoku-container > div:nth-child(2n) .sudoku-cell { border-bottom: 2px solid #555; }
-        .sudoku-container > div:nth-child(6n) .sudoku-cell { border-bottom: 1px solid #ccc; }
-
-        /* Custom Print Button Styles */
-        .print-button {
-            display: inline-block;
-            padding: 0.5em 1em;
-            font-size: 16px;
-            font-weight: 500;
-            color: #0F1116;
-            background-color: #FFFFFF;
-            border: 1px solid rgba(49, 51, 63, 0.2);
-            border-radius: 0.5rem;
-            cursor: pointer;
-            margin-top: 10px;
-            text-align: center;
-            text-decoration: none;
-            transition: all 0.2s ease-in-out;
-        }
-        .print-button:hover {
-            color: #FFFFFF;
-            border-color: #FF4B4B;
-            background-color: #FF4B4B;
-        }
-
-        /* New Print Styles - Hides everything except the target element */
-        @media print {
-            /* Add a class to the body when printing is active */
-            body.sudoku-printing-mode > * {
-                visibility: hidden !important;
-            }
-            body.sudoku-printing-mode .sudoku-print-target,
-            body.sudoku-printing-mode .sudoku-print-target * {
-                visibility: visible !important;
-            }
-            body.sudoku-printing-mode .sudoku-print-target {
-                position: absolute !important;
-                left: 0 !important;
-                top: 0 !important;
-                width: 100% !important;
-            }
-        }
-    </style>
-    <script>
-        function printElement(elementId, title) {
-            const gridElement = document.getElementById(elementId);
-            if (!gridElement) {
-                console.error('Element to print not found:', elementId);
-                return;
-            }
-
-            // Add classes to activate the print-specific CSS
-            document.body.classList.add('sudoku-printing-mode');
-            gridElement.classList.add('sudoku-print-target');
-
-            // Define a function to clean up classes after printing
-            const cleanupAfterPrint = () => {
-                document.body.classList.remove('sudoku-printing-mode');
-                gridElement.classList.remove('sudoku-print-target');
-                window.removeEventListener('afterprint', cleanupAfterPrint);
-            };
-
-            // Listen for the 'afterprint' event to run cleanup
-            window.addEventListener('afterprint', cleanupAfterPrint);
-
-            // Trigger the browser's print dialog
-            window.print();
-        }
-    </script>
-    """
-
 def get_grid_html(grid, container_id):
-    """Generates the HTML for a single Sudoku grid."""
+    """Generates the HTML for a single Sudoku grid for on-screen display."""
     html = f'<div id="{container_id}"><div class="sudoku-container">'
     for r in range(GRID_SIZE):
         html += '<div style="display: contents;">'
@@ -189,11 +142,41 @@ def get_grid_html(grid, container_id):
 
 st.set_page_config(page_title="6x6 Sudoku Generator", layout="wide")
 
-# Inject all CSS and JavaScript at once.
-st.markdown(get_page_setup_html(), unsafe_allow_html=True)
+# Inject CSS for on-screen grid display
+st.markdown("""
+<style>
+    .sudoku-container {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        grid-template-rows: repeat(6, 1fr);
+        border: 3px solid #333;
+        width: 90vmin;
+        height: 60vmin;
+        max-width: 450px;
+        max-height: 300px;
+        margin: 20px auto;
+        font-family: 'Arial', sans-serif;
+        background-color: #fff;
+    }
+    .sudoku-cell {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: clamp(1rem, 4vmin, 1.8rem);
+        font-weight: bold;
+        color: #333;
+        border: 1px solid #ccc;
+    }
+    .sudoku-cell:nth-child(3n) { border-right: 2px solid #555; }
+    .sudoku-cell:nth-child(6n) { border-right: 1px solid #ccc; }
+    .sudoku-container > div:nth-child(2n) .sudoku-cell { border-bottom: 2px solid #555; }
+    .sudoku-container > div:nth-child(6n) .sudoku-cell { border-bottom: 1px solid #ccc; }
+</style>
+""", unsafe_allow_html=True)
+
 
 st.title("🔢 6x6 Sudoku Puzzle Generator")
-st.write("Create a new puzzle to solve on screen or print out.")
+st.write("Create a new puzzle to solve on screen and view or download as a PDF.")
 
 # Sidebar for controls
 with st.sidebar:
@@ -206,15 +189,18 @@ with st.sidebar:
             st.session_state.puzzle = puzzle
             st.session_state.solution = solution
             st.session_state.show_solution = False
+            # Generate PDF data and store in session state
+            st.session_state.puzzle_pdf = create_sudoku_pdf_bytes(puzzle, "Sudoku Puzzle")
+            st.session_state.solution_pdf = create_sudoku_pdf_bytes(solution, "Sudoku Solution")
 
 # Main content area
-col1, col2 = st.columns([0.65, 0.35])
+col1, col2 = st.columns(2)
 
 with col1:
     st.header("Puzzle")
     if 'puzzle' in st.session_state:
         st.markdown(get_grid_html(st.session_state.puzzle, "puzzle-grid"), unsafe_allow_html=True)
-        st.markdown('<button onclick="printElement(\'puzzle-grid\', \'Sudoku Puzzle\')" class="print-button">🖨️ Print Puzzle</button>', unsafe_allow_html=True)
+        st.pdf(st.session_state.puzzle_pdf, height=500)
     else:
         st.info("Click 'Generate New Puzzle' in the sidebar to start.")
 
@@ -226,5 +212,5 @@ with col2:
         
         if st.session_state.get('show_solution', False):
             st.markdown(get_grid_html(st.session_state.solution, "solution-grid"), unsafe_allow_html=True)
-            st.markdown('<button onclick="printElement(\'solution-grid\', \'Sudoku Solution\')" class="print-button">🖨️ Print Solution</button>', unsafe_allow_html=True)
+            st.pdf(st.session_state.solution_pdf, height=500)
 
